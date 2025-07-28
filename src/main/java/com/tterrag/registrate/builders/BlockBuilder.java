@@ -23,7 +23,7 @@ import com.tterrag.registrate.providers.RegistrateLangProvider;
 import com.tterrag.registrate.providers.RegistrateRecipeProvider;
 import com.tterrag.registrate.providers.loot.RegistrateBlockLootTables;
 import com.tterrag.registrate.providers.loot.RegistrateLootTableProvider.LootType;
-import com.tterrag.registrate.util.OneTimeEventReceiver;
+
 import com.tterrag.registrate.util.RegistrateDistExecutor;
 import com.tterrag.registrate.util.entry.BlockEntry;
 import com.tterrag.registrate.util.entry.RegistryEntry;
@@ -33,6 +33,12 @@ import com.tterrag.registrate.util.nullness.NonNullFunction;
 import com.tterrag.registrate.util.nullness.NonNullSupplier;
 import com.tterrag.registrate.util.nullness.NonNullUnaryOperator;
 
+import io.github.fabricators_of_create.porting_lib.models.generators.BlockStateProvider;
+import io.github.fabricators_of_create.porting_lib.models.generators.ModelBuilder;
+import io.github.fabricators_of_create.porting_lib.registry.DeferredHolder;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
+import net.fabricmc.fabric.api.client.rendering.v1.ColorProviderRegistry;
 import net.minecraft.client.color.block.BlockColor;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
@@ -46,14 +52,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
-import net.neoforged.fml.util.ObfuscationReflectionHelper;
-import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
-import net.neoforged.neoforge.client.extensions.common.IClientBlockExtensions;
-import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
-import net.neoforged.neoforge.client.model.generators.BlockStateProvider;
-import net.neoforged.neoforge.registries.DeferredHolder;
 
 /**
  * A builder for blocks, allows for customization of the {@link Block.Properties}, creation of block items, and configuration of data associated with blocks (loot tables, recipes, etc.).
@@ -140,11 +138,11 @@ public class BlockBuilder<T extends Block, P> extends AbstractBuilder<Block, T, 
     }
 
     /**
-     * @deprecated Set your render type in your model's JSON ({@link net.neoforged.neoforge.client.model.generators.ModelBuilder#renderType(ResourceLocation)}) or override {@link net.minecraft.client.resources.model.BakedModel#getRenderTypes(BlockState, net.minecraft.util.RandomSource,  net.neoforged.neoforge.client.model.data.ModelData)}
+     * @deprecated Set your render type in your model's JSON ({@link ModelBuilder#renderType(ResourceLocation)}) or override {@link net.minecraft.client.resources.model.BakedModel#getRenderTypes(BlockState, net.minecraft.util.RandomSource,  net.neoforged.neoforge.client.model.data.ModelData)}
      */
     @Deprecated(forRemoval = true)
     public BlockBuilder<T, P> addLayer(Supplier<Supplier<RenderType>> layer) {
-        RegistrateDistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
+        RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> () -> {
             Preconditions.checkArgument(RenderType.chunkBufferLayers().contains(layer.get().get()), "Invalid block layer: " + layer);
         });
         if (this.renderLayers.isEmpty()) {
@@ -156,18 +154,16 @@ public class BlockBuilder<T extends Block, P> extends AbstractBuilder<Block, T, 
 
     @SuppressWarnings("deprecation")
     protected void registerLayers(T entry) {
-        RegistrateDistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
-            OneTimeEventReceiver.addModListener(getOwner(), FMLClientSetupEvent.class, $ -> {
-                if (renderLayers.size() == 1) {
-                    final RenderType layer = renderLayers.get(0).get().get();
-                    ItemBlockRenderTypes.setRenderLayer(entry, layer);
-                } else if (renderLayers.size() > 1) {
-                    final Set<RenderType> layers = renderLayers.stream()
-                            .map(s -> s.get().get())
-                            .collect(Collectors.toSet());
-                    ItemBlockRenderTypes.setRenderLayer(entry, layers::contains);
-                }
-            });
+        RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> () -> {
+            if (renderLayers.size() == 1) {
+                final RenderType layer = renderLayers.get(0).get().get();
+                BlockRenderLayerMap.INSTANCE.putBlock(entry, layer);
+            } /*else if (renderLayers.size() > 1) { // no
+                final Set<RenderType> layers = renderLayers.stream()
+                    .map(s -> s.get().get())
+                    .collect(Collectors.toSet());
+                ItemBlockRenderTypes.setRenderLayer(entry, layers::contains);
+            }*/
         });
     }
 
@@ -263,19 +259,17 @@ public class BlockBuilder<T extends Block, P> extends AbstractBuilder<Block, T, 
     // TODO it might be worthwhile to abstract this more and add the capability to automatically copy to the item
     public BlockBuilder<T, P> color(NonNullSupplier<Supplier<BlockColor>> colorHandler) {
         if (this.colorHandler == null) {
-            RegistrateDistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> this::registerBlockColor);
+            RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> this::registerBlockColor);
         }
         this.colorHandler = colorHandler;
         return this;
     }
     
     protected void registerBlockColor() {
-        OneTimeEventReceiver.addModListener(getOwner(), RegisterColorHandlersEvent.Block.class, e -> {
-            NonNullSupplier<Supplier<BlockColor>> colorHandler = this.colorHandler;
-            if (colorHandler != null) {
-                e.register(colorHandler.get().get(), getEntry());
-            }
-        });
+        NonNullSupplier<Supplier<BlockColor>> colorHandler = this.colorHandler;
+        if (colorHandler != null) {
+            ColorProviderRegistry.BLOCK.register(colorHandler.get().get(), getEntry());
+        }
     }
 
     /**
@@ -361,8 +355,8 @@ public class BlockBuilder<T extends Block, P> extends AbstractBuilder<Block, T, 
         return setData(ProviderType.RECIPE, cons);
     }
 
-    @Nullable
-    private Function<T, NonNullSupplier<Supplier<IClientBlockExtensions>>> clientExtensionFunc;
+    //@Nullable
+    //private Function<T, NonNullSupplier<Supplier<IClientBlockExtensions>>> clientExtensionFunc;
 
     /**
      * Register a client extension for this block.
@@ -372,13 +366,13 @@ public class BlockBuilder<T extends Block, P> extends AbstractBuilder<Block, T, 
      *            The client extension to register for this block
      * @return this {@link BlockBuilder}
      */
-    public BlockBuilder<T, P> clientExtension(NonNullSupplier<Supplier<IClientBlockExtensions>> clientExtension) {
+    /*public BlockBuilder<T, P> clientExtension(NonNullSupplier<Supplier<IClientBlockExtensions>> clientExtension) {
         if (this.clientExtensionFunc == null) {
-            RegistrateDistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> this::registerClientExtension);
+            RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> this::registerClientExtension);
         }
         this.clientExtensionFunc = block -> clientExtension;
         return this;
-    }
+    }*/
 
     /**
      * Register a client extension for this block.
@@ -388,10 +382,10 @@ public class BlockBuilder<T extends Block, P> extends AbstractBuilder<Block, T, 
      *            The client extension to register for this block
      * @return this {@link BlockBuilder}
      */
-    @Deprecated(forRemoval = true)
+    /*@Deprecated(forRemoval = true)
     public BlockBuilder<T, P> clientExtension(Function<T, NonNullSupplier<Supplier<IClientBlockExtensions>>> clientExtension) {
         if (this.clientExtensionFunc == null) {
-            RegistrateDistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> this::registerClientExtension);
+            RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> this::registerClientExtension);
         }
         this.clientExtensionFunc = clientExtension;
         return this;
@@ -404,7 +398,7 @@ public class BlockBuilder<T extends Block, P> extends AbstractBuilder<Block, T, 
                 e.registerBlock(clientExtension.get().get(), getEntry());
             }
         });
-    }
+    }*/
 
     /**
      * Assign {@link TagKey}{@code s} to this block. Multiple calls will add additional tags.
@@ -421,7 +415,7 @@ public class BlockBuilder<T extends Block, P> extends AbstractBuilder<Block, T, 
     @Override
     protected T createEntry() {
         @Nonnull BlockBehaviour.Properties properties = this.initialProperties.get();
-        ObfuscationReflectionHelper.setPrivateValue(BlockBehaviour.Properties.class, properties, null, "drops");
+        //ObfuscationReflectionHelper.setPrivateValue(BlockBehaviour.Properties.class, properties, null, "drops"); // ??
         properties = propertiesCallback.apply(properties);
         return factory.apply(properties);
     }

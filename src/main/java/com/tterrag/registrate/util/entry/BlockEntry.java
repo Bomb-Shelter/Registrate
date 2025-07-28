@@ -2,9 +2,9 @@ package com.tterrag.registrate.util.entry;
 
 import com.tterrag.registrate.AbstractRegistrate;
 
+import io.github.fabricators_of_create.porting_lib.registry.DeferredHolder;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.registries.DeferredHolder;
 
 public class BlockEntry<T extends Block> extends ItemProviderEntry<Block, T> {
 

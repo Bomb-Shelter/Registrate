@@ -15,7 +15,7 @@ import com.tterrag.registrate.AbstractRegistrate;
 import com.tterrag.registrate.providers.ProviderType;
 import com.tterrag.registrate.providers.RegistrateLangProvider;
 import com.tterrag.registrate.providers.RegistrateTagsProvider;
-import com.tterrag.registrate.util.OneTimeEventReceiver;
+
 import com.tterrag.registrate.util.RegistrateDistExecutor;
 import com.tterrag.registrate.util.entry.FluidEntry;
 import com.tterrag.registrate.util.entry.RegistryEntry;
@@ -25,9 +25,22 @@ import com.tterrag.registrate.util.nullness.NonNullConsumer;
 import com.tterrag.registrate.util.nullness.NonNullFunction;
 import com.tterrag.registrate.util.nullness.NonNullSupplier;
 
+import io.github.fabricators_of_create.porting_lib.core.util.Lazy;
+import io.github.fabricators_of_create.porting_lib.fluids.BaseFlowingFluid;
+import io.github.fabricators_of_create.porting_lib.fluids.FluidType;
+import io.github.fabricators_of_create.porting_lib.fluids.PortingLibFluids;
+import io.github.fabricators_of_create.porting_lib.fluids.wrapper.FluidAttributeFluidType;
+import io.github.fabricators_of_create.porting_lib.registry.DeferredHolder;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
+import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandler;
+import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandlerRegistry;
+import net.fabricmc.fabric.api.client.render.fluid.v1.SimpleFluidRenderHandler;
+import net.fabricmc.fabric.api.transfer.v1.client.fluid.FluidVariantRenderHandler;
 import net.minecraft.Util;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
@@ -40,16 +53,6 @@ import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluid;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
-import net.neoforged.neoforge.client.extensions.common.IClientBlockExtensions;
-import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
-import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
-import net.neoforged.neoforge.common.util.Lazy;
-import net.neoforged.neoforge.fluids.BaseFlowingFluid;
-import net.neoforged.neoforge.fluids.FluidType;
-import net.neoforged.neoforge.registries.DeferredHolder;
-import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 public class FluidBuilder<T extends BaseFlowingFluid, P> extends AbstractBuilder<Fluid, T, P, FluidBuilder<T, P>> {
 
@@ -60,30 +63,27 @@ public class FluidBuilder<T extends BaseFlowingFluid, P> extends AbstractBuilder
 
 
     @Nullable
-    private NonNullSupplier<Supplier<IClientFluidTypeExtensions>> clientExtension;
+    private NonNullSupplier<Supplier<FluidRenderHandler>> clientExtension;
 
     /**
-     * Register a client extension for this block. The {@link IClientBlockExtensions} instance can be shared across many items.
+     * Register a client extension for this block. The {@link FluidRenderHandler} instance can be shared across many items.
      *
      * @param clientExtension
      *            The client extension to register for this block
      * @return this {@link BlockBuilder}
      */
-    public FluidBuilder<T, P> clientExtension(NonNullSupplier<Supplier<IClientFluidTypeExtensions>> clientExtension) {
+    public FluidBuilder<T, P> clientExtension(NonNullSupplier<Supplier<FluidRenderHandler>> clientExtension) {
         if (this.clientExtension == null) {
-            RegistrateDistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> this::registerClientExtension);
+            RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> this::registerClientExtension);
         }
         this.clientExtension = clientExtension;
         return this;
     }
 
     protected void registerClientExtension() {
-        OneTimeEventReceiver.addModListener(getOwner(), RegisterClientExtensionsEvent.class, e -> {
-            NonNullSupplier<Supplier<IClientFluidTypeExtensions>> clientExtension = this.clientExtension;
-            if (clientExtension != null) {
-                e.registerFluidType(clientExtension.get().get(), fluidType.get());
-            }
-        });
+        if (clientExtension != null) {
+            FluidRenderHandlerRegistry.INSTANCE.register(this.getEntry(), this.clientExtension.get().get());
+        }
     }
 
     /**
@@ -376,7 +376,7 @@ public class FluidBuilder<T extends BaseFlowingFluid, P> extends AbstractBuilder
 
     @SuppressWarnings("deprecation")
     public FluidBuilder<T, P> renderType(Supplier<Supplier<RenderType>> layer) {
-        RegistrateDistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
+        RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> () -> {
             Preconditions.checkArgument(RenderType.chunkBufferLayers().contains(layer.get().get()), "Invalid render type: " + layer);
         });
 
@@ -389,14 +389,12 @@ public class FluidBuilder<T extends BaseFlowingFluid, P> extends AbstractBuilder
 
     @SuppressWarnings("deprecation")
     protected void registerRenderType(T entry) {
-        RegistrateDistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
-            OneTimeEventReceiver.addModListener(getOwner(), FMLClientSetupEvent.class, $ -> {
-                if (this.layer != null) {
-                    RenderType layer = this.layer.get().get();
-                    ItemBlockRenderTypes.setRenderLayer(entry, layer);
-                    ItemBlockRenderTypes.setRenderLayer(getSource(), layer);
-                }
-            });
+        RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> () -> {
+            if (this.layer != null) {
+                RenderType layer = this.layer.get().get();
+                BlockRenderLayerMap.INSTANCE.putFluid(entry, layer);
+                BlockRenderLayerMap.INSTANCE.putFluid(getSource(), layer);
+            }
         });
     }
 
@@ -626,7 +624,7 @@ public class FluidBuilder<T extends BaseFlowingFluid, P> extends AbstractBuilder
         if (this.fluidType != null) {
             // Register the type.
             if (this.registerType) {
-                getOwner().simple(this, this.sourceName, NeoForgeRegistries.Keys.FLUID_TYPES, this.fluidType);
+                getOwner().simple(this, this.sourceName, PortingLibFluids.FLUID_TYPE_REGISTRY, this.fluidType);
             }
         } else {
             throw new IllegalStateException("Fluid must have a type: " + getName());
@@ -657,25 +655,10 @@ public class FluidBuilder<T extends BaseFlowingFluid, P> extends AbstractBuilder
         return new FluidEntry<>(getOwner(), delegate);
     }
 
-	public static class DefaultFluidTypeExtension implements IClientFluidTypeExtensions {
-
-		private final ResourceLocation stillTexture,flowingTexture;
-
+	public static class DefaultFluidTypeExtension extends SimpleFluidRenderHandler {
 		public DefaultFluidTypeExtension(ResourceLocation stillTexture, ResourceLocation flowingTexture) {
-			this.stillTexture = stillTexture;
-			this.flowingTexture = flowingTexture;
+            super(stillTexture, flowingTexture);
 		}
-
-		@Override
-		public ResourceLocation getStillTexture() {
-			return stillTexture;
-		}
-
-		@Override
-		public ResourceLocation getFlowingTexture() {
-			return flowingTexture;
-		}
-
 	}
 
 }

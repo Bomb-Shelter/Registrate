@@ -3,15 +3,15 @@ package com.tterrag.registrate.providers;
 import com.tterrag.registrate.AbstractRegistrate;
 import com.tterrag.registrate.util.nullness.NonNullSupplier;
 
+import io.github.fabricators_of_create.porting_lib.data.ExistingFileHelper;
+import io.github.fabricators_of_create.porting_lib.models.generators.ItemModelBuilder;
+import io.github.fabricators_of_create.porting_lib.models.generators.ItemModelProvider;
+import io.github.fabricators_of_create.porting_lib.models.generators.ModelFile;
+import net.fabricmc.api.EnvType;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.data.PackOutput;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.ItemLike;
-import net.neoforged.fml.LogicalSide;
-import net.neoforged.neoforge.client.model.generators.ItemModelBuilder;
-import net.neoforged.neoforge.client.model.generators.ItemModelProvider;
-import net.neoforged.neoforge.client.model.generators.ModelFile;
-import net.neoforged.neoforge.common.data.ExistingFileHelper;
 
 public class RegistrateItemModelProvider extends ItemModelProvider implements RegistrateProvider {
 
@@ -23,8 +23,8 @@ public class RegistrateItemModelProvider extends ItemModelProvider implements Re
     }
 
     @Override
-    public LogicalSide getSide() {
-        return LogicalSide.CLIENT;
+    public EnvType getSide() {
+        return EnvType.CLIENT;
     }
 
     @Override

@@ -12,6 +12,8 @@ import com.tterrag.registrate.util.nullness.NonNullBiFunction;
 import com.tterrag.registrate.util.nullness.NonNullFunction;
 import com.tterrag.registrate.util.nullness.NonNullSupplier;
 import com.tterrag.registrate.util.nullness.NonnullType;
+import io.github.fabricators_of_create.porting_lib.data.PortingLibTagsProvider;
+import io.github.fabricators_of_create.porting_lib.registry.DeferredHolder;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +24,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagEntry;
 import net.minecraft.tags.TagKey;
-import net.neoforged.neoforge.registries.DeferredHolder;
 
 import java.util.Arrays;
 
@@ -101,7 +102,13 @@ public abstract class AbstractBuilder<R, T extends R, P, S extends AbstractBuild
             setData(type, (ctx, prov) -> tagsByType.get(type).stream()
                     .map(t -> (TagKey<R>) t)
                     .map(prov::addTag)
-                    .forEach(b -> b.add(asTag())));
+                    .forEach(b -> {
+                        var entry = asTag();
+                        if (entry.tag)
+                            b.addTag(TagKey.create(this.getRegistryKey(), entry.id));
+                        else
+                            b.add(ResourceKey.create(this.getRegistryKey(), entry.id));
+                    }));
         }
         tagsByType.putAll(type, Arrays.asList(tags));
         return (S) this;

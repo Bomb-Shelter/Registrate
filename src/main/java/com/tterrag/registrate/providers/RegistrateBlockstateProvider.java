@@ -2,13 +2,13 @@ package com.tterrag.registrate.providers;
 
 import com.tterrag.registrate.AbstractRegistrate;
 
+import io.github.fabricators_of_create.porting_lib.data.ExistingFileHelper;
+import io.github.fabricators_of_create.porting_lib.models.generators.BlockStateProvider;
+import io.github.fabricators_of_create.porting_lib.models.generators.MultiPartBlockStateBuilder;
+import io.github.fabricators_of_create.porting_lib.models.generators.VariantBlockStateBuilder;
+import net.fabricmc.api.EnvType;
 import net.minecraft.data.PackOutput;
 import net.minecraft.world.level.block.Block;
-import net.neoforged.fml.LogicalSide;
-import net.neoforged.neoforge.client.model.generators.BlockStateProvider;
-import net.neoforged.neoforge.client.model.generators.MultiPartBlockStateBuilder;
-import net.neoforged.neoforge.client.model.generators.VariantBlockStateBuilder;
-import net.neoforged.neoforge.common.data.ExistingFileHelper;
 
 import java.util.Optional;
 
@@ -22,8 +22,8 @@ public class RegistrateBlockstateProvider extends BlockStateProvider implements 
     }
 
     @Override
-    public LogicalSide getSide() {
-        return LogicalSide.CLIENT;
+    public EnvType getSide() {
+        return EnvType.CLIENT;
     }
 
     @Override

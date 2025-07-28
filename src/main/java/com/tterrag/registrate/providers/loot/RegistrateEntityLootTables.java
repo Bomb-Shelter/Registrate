@@ -8,26 +8,29 @@ import javax.annotation.Generated;
 
 import com.tterrag.registrate.AbstractRegistrate;
 
+import io.github.fabricators_of_create.porting_lib.data.ModdedEntityLootSubProvider;
 import lombok.RequiredArgsConstructor;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.loot.EntityLootSubProvider;
+import net.minecraft.data.loot.LootTableSubProvider;
 import net.minecraft.data.loot.packs.VanillaEntityLoot;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.FrogVariant;
+import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 
-public class RegistrateEntityLootTables extends VanillaEntityLoot implements RegistrateLootTables {
+public class RegistrateEntityLootTables extends ModdedEntityLootSubProvider implements RegistrateLootTables {
 
     private final AbstractRegistrate<?> parent;
     private final Consumer<RegistrateEntityLootTables> callback;
 
     public RegistrateEntityLootTables(HolderLookup.Provider p_346214_, AbstractRegistrate<?> parent, Consumer<RegistrateEntityLootTables> callback) {
-        super(p_346214_);
+        super(FeatureFlags.REGISTRY.allFlags(), p_346214_);
         this.parent = parent;
         this.callback = callback;
     }
@@ -50,13 +53,13 @@ public class RegistrateEntityLootTables extends VanillaEntityLoot implements Reg
     // GENERATED START - DO NOT EDIT BELOW THIS LINE
 
     /** Generated override to expose protected method: {@link EntityLootSubProvider#createSheepTable} */
-    @Generated(value = "com.tterrag.registrate.test.meta.UpdateEntityLootTables", date = "Tue, 18 Jun 2024 17:49:13 GMT")
-    public static LootTable.Builder createSheepTable(ItemLike p_249422_) { return EntityLootSubProvider.createSheepTable(p_249422_); }
+    /*@Generated(value = "com.tterrag.registrate.test.meta.UpdateEntityLootTables", date = "Tue, 18 Jun 2024 17:49:13 GMT")
+    public static LootTable.Builder createSheepTable(ItemLike p_249422_) { return LootTableSubProvider.createSheepTable(p_249422_); }*/
 
     /** Generated override to expose protected method: {@link EntityLootSubProvider#canHaveLootTable} */
-    @Override
+    /*@Override
     @Generated(value = "com.tterrag.registrate.test.meta.UpdateEntityLootTables", date = "Tue, 18 Jun 2024 17:49:13 GMT")
-    public boolean canHaveLootTable(EntityType<?> p_249029_) { return super.canHaveLootTable(p_249029_); }
+    public boolean canHaveLootTable(EntityType<?> p_249029_) { return super.canHaveLootTable(p_249029_); }*/
 
     /** Generated override to expose protected method: {@link EntityLootSubProvider#killedByFrogVariant} */
     @Override

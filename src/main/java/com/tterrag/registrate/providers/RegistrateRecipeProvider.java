@@ -13,7 +13,11 @@ import com.tterrag.registrate.AbstractRegistrate;
 import com.tterrag.registrate.util.DataIngredient;
 import com.tterrag.registrate.util.nullness.NonNullSupplier;
 
+import io.github.fabricators_of_create.porting_lib.tags.Tags;
 import lombok.Getter;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.fabric.api.datagen.v1.FabricDataOutput;
+import net.fabricmc.fabric.api.datagen.v1.provider.FabricRecipeProvider;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.advancements.Criterion;
@@ -43,17 +47,14 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.crafting.*;
 import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.block.Block;
-import net.neoforged.fml.LogicalSide;
-import net.neoforged.neoforge.common.Tags;
-import net.neoforged.neoforge.common.conditions.ICondition;
 
-public class RegistrateRecipeProvider extends RecipeProvider implements RegistrateProvider, RecipeOutput {
+public class RegistrateRecipeProvider extends FabricRecipeProvider implements RegistrateProvider, RecipeOutput {
 
     private final AbstractRegistrate<?> owner;
     @Getter
 	private HolderLookup.Provider provider;
 
-    public RegistrateRecipeProvider(AbstractRegistrate<?> owner, PackOutput output, CompletableFuture<HolderLookup.Provider> provider) {
+    public RegistrateRecipeProvider(AbstractRegistrate<?> owner, FabricDataOutput output, CompletableFuture<HolderLookup.Provider> provider) {
         super(output, provider);
         this.owner = owner;
     }
@@ -63,25 +64,25 @@ public class RegistrateRecipeProvider extends RecipeProvider implements Registra
     }
 
 	@Override
-    protected CompletableFuture<?> run(CachedOutput output, HolderLookup.Provider provider) {
+    public CompletableFuture<?> run(CachedOutput output, HolderLookup.Provider provider) {
         this.provider = provider;
         return super.run(output, provider);
     }
 
     @Override
-    public LogicalSide getSide() {
-        return LogicalSide.SERVER;
+    public EnvType getSide() {
+        return EnvType.SERVER;
     }
 
     @Nullable
     private RecipeOutput callback;
 
     @Override
-    public void accept(ResourceLocation id, Recipe<?> recipe, @org.jetbrains.annotations.Nullable AdvancementHolder advancement, ICondition... conditions) {
+    public void accept(ResourceLocation id, Recipe<?> recipe, @org.jetbrains.annotations.Nullable AdvancementHolder advancement) {
         if (callback == null) {
             throw new IllegalStateException("Cannot accept recipes outside of a call to registerRecipes");
         }
-        callback.accept(id, recipe, advancement, conditions);
+        callback.accept(id, recipe, advancement);
     }
 
     @Override
@@ -93,10 +94,15 @@ public class RegistrateRecipeProvider extends RecipeProvider implements Registra
     }
 
     @Override
-    protected void buildRecipes(RecipeOutput recipeOutput) {
+    public void buildRecipes(RecipeOutput recipeOutput) {
         this.callback = recipeOutput;
         owner.genData(ProviderType.RECIPE, this);
         this.callback = null;
+    }
+
+    @Override
+    public ResourceLocation getRecipeIdentifier(ResourceLocation recipeId) {
+        return recipeId;
     }
 
     public ResourceLocation safeId(ResourceLocation id) {
@@ -331,15 +337,15 @@ public class RegistrateRecipeProvider extends RecipeProvider implements Registra
     public CompletableFuture<?> buildAdvancement(CachedOutput p_253674_, HolderLookup.Provider p_323646_, AdvancementHolder p_301116_) { return super.buildAdvancement(p_253674_, p_323646_, p_301116_); }
 
     /** Generated override to expose protected method: {@link RecipeProvider#buildAdvancement} */
-    @Override
+    /*@Override
     @Generated(value = "com.tterrag.registrate.test.meta.UpdateRecipeProvider", date = "Tue, 18 Jun 2024 17:51:56 GMT")
     public CompletableFuture<?> buildAdvancement(CachedOutput p_253674_, HolderLookup.Provider p_323646_, AdvancementHolder p_301116_, net.neoforged.neoforge.common.conditions.ICondition... conditions) { return super.buildAdvancement(p_253674_, p_323646_, p_301116_, conditions); }
-
+*/
     /** Generated override to expose protected method: {@link RecipeProvider#generateForEnabledBlockFamilies} */
-    @Override
+    /*@Override
     @Generated(value = "com.tterrag.registrate.test.meta.UpdateRecipeProvider", date = "Tue, 18 Jun 2024 17:51:56 GMT")
     public void generateForEnabledBlockFamilies(RecipeOutput p_301146_, FeatureFlagSet p_251836_) { super.generateForEnabledBlockFamilies(p_301146_, p_251836_); }
-
+*/
     /** Generated override to expose protected method: {@link RecipeProvider#netheriteSmithing} */
     @Generated(value = "com.tterrag.registrate.test.meta.UpdateRecipeProvider", date = "Tue, 18 Jun 2024 17:51:56 GMT")
     public static void netheriteSmithing(RecipeOutput p_300886_, Item p_250046_, RecipeCategory p_248986_, Item p_250389_) { RecipeProvider.netheriteSmithing(p_300886_, p_250046_, p_248986_, p_250389_); }

@@ -1,6 +1,6 @@
 package com.tterrag.registrate.util.nullness;
 
-import net.neoforged.neoforge.common.util.Lazy;
+import io.github.fabricators_of_create.porting_lib.core.util.Lazy;
 
 import java.util.Objects;
 import java.util.function.Supplier;

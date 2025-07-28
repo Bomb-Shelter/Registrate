@@ -4,17 +4,18 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Lists;
 import com.tterrag.registrate.AbstractRegistrate;
+import com.tterrag.registrate.fabric.FabricDatagenInfo;
 import com.tterrag.registrate.util.DebugMarkers;
 import com.tterrag.registrate.util.nullness.NonnullType;
 import lombok.extern.log4j.Log4j2;
 
+import net.fabricmc.api.EnvType;
+import net.fabricmc.fabric.api.datagen.v1.FabricDataOutput;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
 import net.minecraft.data.CachedOutput;
 import net.minecraft.data.DataProvider;
 import net.minecraft.resources.ResourceKey;
-import net.neoforged.fml.LogicalSide;
-import net.neoforged.neoforge.data.event.GatherDataEvent;
 
 import javax.annotation.Nullable;
 import java.util.*;
@@ -38,17 +39,19 @@ public class RegistrateDataProvider implements DataProvider {
     private final Map<ProviderType<?>, RegistrateProvider> subProviders = new LinkedHashMap<>();
     private final CompletableFuture<HolderLookup.Provider> registriesLookup;
 
-    public RegistrateDataProvider(AbstractRegistrate<?> parent, String modid, GatherDataEvent event) {
+    public RegistrateDataProvider(AbstractRegistrate<?> parent, String modid, FabricDatagenInfo info) {
         this.mod = modid;
-        this.registriesLookup = event.getLookupProvider();
+        this.registriesLookup = info.lookupProvider();
 
-        EnumSet<LogicalSide> sides = EnumSet.noneOf(LogicalSide.class);
-        if (event.includeServer()) {
-            sides.add(LogicalSide.SERVER);
+        EnumSet<EnvType> sides = EnumSet.noneOf(EnvType.class);
+        /*if (event.includeServer()) {
+            sides.add(EnvType.SERVER);
         }
         if (event.includeClient()) {
-            sides.add(LogicalSide.CLIENT);
-        }
+            sides.add(EnvType.CLIENT);
+        }*/
+        sides.add(EnvType.SERVER);
+        sides.add(EnvType.CLIENT);
 
         log.debug(DebugMarkers.DATA, "Gathering providers for sides: {}", sides);
         Map<ProviderType<?>, RegistrateProvider> known = new HashMap<>();
@@ -56,7 +59,7 @@ public class RegistrateDataProvider implements DataProvider {
             ProviderType<?> type = sorted.type();
             var lookup = registriesLookup;
             if (sorted.parent() != null) lookup = ((RegistrateLookupFillerProvider) known.get(sorted.parent())).getFilledProvider();
-            RegistrateProvider prov = ProviderType.create(type, parent, event, known, lookup);
+            RegistrateProvider prov = ProviderType.create(type, parent, info, known, lookup);
             if (prov instanceof RegistrateTagsProvider<?> tagsProvider && TAG_TYPES.get(tagsProvider.registry()) != type) {
 				throw new IllegalStateException("Tag providers must be registered through ProviderType::registerTag");
             }

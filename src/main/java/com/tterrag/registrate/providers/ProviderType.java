@@ -1,11 +1,15 @@
 package com.tterrag.registrate.providers;
 
 import com.tterrag.registrate.AbstractRegistrate;
+import com.tterrag.registrate.fabric.FabricDatagenInfo;
 import com.tterrag.registrate.providers.loot.RegistrateLootTableProvider;
 import com.tterrag.registrate.util.nullness.FieldsAreNonnullByDefault;
 import com.tterrag.registrate.util.nullness.NonNullBiFunction;
 import com.tterrag.registrate.util.nullness.NonNullFunction;
 import com.tterrag.registrate.util.nullness.NonNullUnaryOperator;
+import io.github.fabricators_of_create.porting_lib.data.ExistingFileHelper;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.fabric.api.datagen.v1.FabricDataOutput;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -15,9 +19,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
-import net.neoforged.fml.LogicalSide;
-import net.neoforged.neoforge.common.data.ExistingFileHelper;
-import net.neoforged.neoforge.data.event.GatherDataEvent;
 
 import javax.annotation.Nonnull;
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -51,18 +52,18 @@ public interface ProviderType<T extends RegistrateProvider> {
     ProviderType<RegistrateItemTagsProvider> ITEM_TAGS = registerTag("tags/item", Registries.ITEM, c -> new RegistrateItemTagsProvider(c.parent(), c.type(), "items", c.output(), c.provider(), c.get(BLOCK_TAGS).contentsGetter(), c.fileHelper()));
     ProviderType<RegistrateTagsProvider.IntrinsicImpl<Fluid>> FLUID_TAGS = registerIntrinsicTag("tags/fluid", "fluids", Registries.FLUID, fluid -> fluid.builtInRegistryHolder().key());
     ProviderType<RegistrateTagsProvider.IntrinsicImpl<EntityType<?>>> ENTITY_TAGS = registerIntrinsicTag("tags/entity", "entity_types", Registries.ENTITY_TYPE, entityType -> entityType.builtInRegistryHolder().key());
-    ProviderType<RegistrateGenericProvider> GENERIC_SERVER = registerProvider("registrate_generic_server_provider",  c -> new RegistrateGenericProvider(c.parent(), c.event(), LogicalSide.SERVER, c.type()));
+    ProviderType<RegistrateGenericProvider> GENERIC_SERVER = registerProvider("registrate_generic_server_provider",  c -> new RegistrateGenericProvider(c.parent(), c.event(), EnvType.SERVER, c.type()));
 
     // CLIENT DATA
     ProviderType<RegistrateBlockstateProvider> BLOCKSTATE = registerProvider("blockstate", c -> new RegistrateBlockstateProvider(c.parent(), c.output(), c.fileHelper()));
     ProviderType<RegistrateItemModelProvider> ITEM_MODEL = registerProvider("item_model", c -> new RegistrateItemModelProvider(c.parent(), c.output(), c.get(BLOCKSTATE).getExistingFileHelper()));
     ProviderType<RegistrateLangProvider> LANG = registerProvider("lang", c -> new RegistrateLangProvider(c.parent(), c.output()));
-    ProviderType<RegistrateGenericProvider> GENERIC_CLIENT = registerProvider("registrate_generic_client_provider", c -> new RegistrateGenericProvider(c.parent(), c.event(), LogicalSide.CLIENT, c.type()));
+    ProviderType<RegistrateGenericProvider> GENERIC_CLIENT = registerProvider("registrate_generic_client_provider", c -> new RegistrateGenericProvider(c.parent(), c.event(), EnvType.CLIENT, c.type()));
 
     record Context<T extends RegistrateProvider>(ProviderType<T> type, AbstractRegistrate<?> parent,
-                                                 @Deprecated GatherDataEvent event,
+                                                 @Deprecated FabricDatagenInfo event,
                                                  Map<ProviderType<?>, RegistrateProvider> existing,
-                                                 PackOutput output, ExistingFileHelper fileHelper,
+                                                 FabricDataOutput output, ExistingFileHelper fileHelper,
                                                  CompletableFuture<HolderLookup.Provider> provider) {
 
         public <R extends RegistrateProvider> R get(ProviderType<R> other) {
@@ -76,13 +77,13 @@ public interface ProviderType<T extends RegistrateProvider> {
     }
 
     @Deprecated
-    T create(AbstractRegistrate<?> parent, GatherDataEvent event, Map<ProviderType<?>, RegistrateProvider> existing);
+    T create(AbstractRegistrate<?> parent, FabricDatagenInfo info, Map<ProviderType<?>, RegistrateProvider> existing);
 
     interface DependencyAwareProviderType<T extends RegistrateProvider> extends ProviderType<T> {
 
         @Override
-        default T create(AbstractRegistrate<?> parent, GatherDataEvent event, Map<ProviderType<?>, RegistrateProvider> existing) {
-            return create(new Context<>(this, parent, event, existing, event.getGenerator().getPackOutput(), event.getExistingFileHelper(), event.getLookupProvider()));
+        default T create(AbstractRegistrate<?> parent, FabricDatagenInfo info, Map<ProviderType<?>, RegistrateProvider> existing) {
+            return create(new Context<>(this, parent, info, existing, info.packOutput(), info.existingFileHelper(), info.lookupProvider()));
         }
 
         @Override
@@ -92,7 +93,7 @@ public interface ProviderType<T extends RegistrateProvider> {
 
     interface SimpleServerDataFactory<T extends RegistrateProvider> extends DependencyAwareProviderType<T> {
 
-        T create(AbstractRegistrate<?> parent, PackOutput output, CompletableFuture<HolderLookup.Provider> provider);
+        T create(AbstractRegistrate<?> parent, FabricDataOutput output, CompletableFuture<HolderLookup.Provider> provider);
 
         @Override
         default T create(Context<T> context) {
@@ -112,7 +113,7 @@ public interface ProviderType<T extends RegistrateProvider> {
         ProviderType<T> ret = new ProviderType<T>() {
 
             @Override
-            public T create(@Nonnull AbstractRegistrate<?> parent, GatherDataEvent event, Map<ProviderType<?>, RegistrateProvider> existing) {
+            public T create(@Nonnull AbstractRegistrate<?> parent, FabricDatagenInfo event, Map<ProviderType<?>, RegistrateProvider> existing) {
                 return type.apply(this).create(parent, event, existing);
             }
         };
@@ -121,11 +122,11 @@ public interface ProviderType<T extends RegistrateProvider> {
 
     @Deprecated
     @Nonnull
-    static <T extends RegistrateProvider> ProviderType<T> register(String name, NonNullFunction<ProviderType<T>, NonNullBiFunction<AbstractRegistrate<?>, GatherDataEvent, T>> type) {
+    static <T extends RegistrateProvider> ProviderType<T> register(String name, NonNullFunction<ProviderType<T>, NonNullBiFunction<AbstractRegistrate<?>, FabricDatagenInfo, T>> type) {
         ProviderType<T> ret = new ProviderType<T>() {
 
             @Override
-            public T create(@Nonnull AbstractRegistrate<?> parent, GatherDataEvent event, Map<ProviderType<?>, RegistrateProvider> existing) {
+            public T create(@Nonnull AbstractRegistrate<?> parent, FabricDatagenInfo event, Map<ProviderType<?>, RegistrateProvider> existing) {
                 return type.apply(this).apply(parent, event);
             }
         };
@@ -134,11 +135,11 @@ public interface ProviderType<T extends RegistrateProvider> {
 
     @Deprecated
     @Nonnull
-    static <T extends RegistrateProvider> ProviderType<T> register(String name, NonNullBiFunction<AbstractRegistrate<?>, GatherDataEvent, T> type) {
+    static <T extends RegistrateProvider> ProviderType<T> register(String name, NonNullBiFunction<AbstractRegistrate<?>, FabricDatagenInfo, T> type) {
         ProviderType<T> ret = new ProviderType<T>() {
 
             @Override
-            public T create(AbstractRegistrate<?> parent, GatherDataEvent event, Map<ProviderType<?>, RegistrateProvider> existing) {
+            public T create(AbstractRegistrate<?> parent, FabricDatagenInfo event, Map<ProviderType<?>, RegistrateProvider> existing) {
                 return type.apply(parent, event);
             }
         };
@@ -183,8 +184,8 @@ public interface ProviderType<T extends RegistrateProvider> {
         return registerTag(providerName, registry, c -> new RegistrateTagsProvider.Impl<>(c.parent(), c.type(), typeName, c.output(), registry, c.provider(), c.fileHelper()));
     }
 
-    static <T extends RegistrateProvider> T create(ProviderType<T> type, AbstractRegistrate<?> parent, GatherDataEvent event, Map<ProviderType<?>, RegistrateProvider> existing, CompletableFuture<HolderLookup.Provider> provider) {
-        return type.create(new Context<>(type, parent, event, existing, event.getGenerator().getPackOutput(), event.getExistingFileHelper(), provider));
+    static <T extends RegistrateProvider> T create(ProviderType<T> type, AbstractRegistrate<?> parent, FabricDatagenInfo info, Map<ProviderType<?>, RegistrateProvider> existing, CompletableFuture<HolderLookup.Provider> provider) {
+        return type.create(new Context<>(type, parent, info, existing, info.packOutput(), info.existingFileHelper(), provider));
     }
 
 }

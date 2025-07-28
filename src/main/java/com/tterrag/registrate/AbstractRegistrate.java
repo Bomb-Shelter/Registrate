@@ -20,16 +20,36 @@ import javax.annotation.Nullable;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Table;
 import com.mojang.serialization.Codec;
+import com.tterrag.registrate.fabric.FabricDatagenInfo;
+import com.tterrag.registrate.fabric.RegistryUtil;
 import com.tterrag.registrate.providers.*;
+import io.github.fabricators_of_create.porting_lib.data.ExistingFileHelper;
+import io.github.fabricators_of_create.porting_lib.fluids.BaseFlowingFluid;
+import io.github.fabricators_of_create.porting_lib.fluids.FluidType;
+import io.github.fabricators_of_create.porting_lib.item.itemgroup.PortingLibCreativeTab;
+import io.github.fabricators_of_create.porting_lib.registry.DeferredHolder;
+import io.github.fabricators_of_create.porting_lib.registry.DeferredRegister;
+import io.github.fabricators_of_create.porting_lib.registry.RegistryBuilder;
 import lombok.Setter;
+import net.fabricmc.fabric.api.datagen.v1.FabricDataGenerator;
+import net.fabricmc.fabric.api.event.registry.DynamicRegistries;
+import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
+import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroupEntries;
+import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
+import net.fabricmc.fabric.impl.datagen.FabricDataGenHelper;
+import net.fabricmc.fabric.mixin.registry.sync.RegistriesAccessor;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.Util;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.MenuAccess;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
@@ -44,16 +64,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.fml.loading.FMLLoader;
-import net.neoforged.neoforge.data.event.GatherDataEvent;
-import net.neoforged.neoforge.data.loading.DatagenModLoader;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.fluids.BaseFlowingFluid;
-import net.neoforged.neoforge.fluids.FluidType;
-import net.neoforged.neoforge.registries.*;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.message.Message;
@@ -72,13 +82,13 @@ import com.tterrag.registrate.builders.EntityBuilder;
 import com.tterrag.registrate.builders.FluidBuilder;
 import com.tterrag.registrate.builders.ItemBuilder;
 import com.tterrag.registrate.builders.MenuBuilder;
-import com.tterrag.registrate.builders.MenuBuilder.ForgeMenuFactory;
+import com.tterrag.registrate.builders.MenuBuilder.FabricMenuFactory;
 import com.tterrag.registrate.builders.MenuBuilder.MenuFactory;
 import com.tterrag.registrate.builders.MenuBuilder.ScreenFactory;
 import com.tterrag.registrate.builders.NoConfigBuilder;
 import com.tterrag.registrate.util.CreativeModeTabModifier;
 import com.tterrag.registrate.util.DebugMarkers;
-import com.tterrag.registrate.util.OneTimeEventReceiver;
+
 import com.tterrag.registrate.util.entry.ItemEntry;
 import com.tterrag.registrate.util.entry.RegistryEntry;
 import com.tterrag.registrate.util.nullness.NonNullBiFunction;
@@ -136,9 +146,9 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
             this.delegate = entryFactory.apply(DeferredHolder.create(type, name));
         }
 
-        void register(RegisterEvent event) {
+        void register(Registry<R> registry) {
             T entry = creator.get();
-            event.register(type, rh -> rh.register(name, entry));
+            Registry.register(registry, name, entry);
             callbacks.forEach(c -> c.accept(entry));
             callbacks.clear();
         }
@@ -155,7 +165,7 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
      * @return {@code true} when in a dev environment (specifically, {@link FMLLoader#isProduction()} == false)
      */
     public static boolean isDevEnvironment() {
-        return !FMLLoader.isProduction();
+        return FabricLoader.getInstance().isDevelopmentEnvironment();
     }
 
     private final Table<ResourceKey<? extends Registry<?>>, String, Registration<?, ?>> registrations = HashBasedTable.create();
@@ -170,7 +180,7 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
     private final Multimap<ResourceKey<CreativeModeTab>, Consumer<CreativeModeTabModifier>> creativeModeTabModifiers = ArrayListMultimap.create();
     private ResourceKey<CreativeModeTab> defaultCreativeModeTab = CreativeModeTabs.SEARCH;
 
-    private final NonNullSupplier<Boolean> doDatagen = NonNullSupplier.lazy(DatagenModLoader::isRunningDataGen);
+    private final NonNullSupplier<Boolean> doDatagen = NonNullSupplier.lazy(() -> FabricDataGenHelper.ENABLED);
 
     /**
      * The mod ID that this {@link AbstractRegistrate} is creating objects for
@@ -181,9 +191,9 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
     /**
      * Get the mod event bus that event listeners will be registered to. Useful when Registrate is used in mods that use alternative language loaders, such as forgelin.
      */
-    @Getter @Setter
+    /*@Getter @Setter
     @Nullable
-    private IEventBus modEventBus;
+    private IEventBus modEventBus;*/
 
     @Nullable
     private String currentName;
@@ -218,25 +228,24 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
      *            The event bus
      * @return This {@link AbstractRegistrate} object
      */
-    public S registerEventListeners(IEventBus bus) {
-        if (this.modEventBus == null) {
-            this.modEventBus = bus;
-        }
-
-        Consumer<RegisterEvent> onRegister = this::onRegister;
-        Consumer<RegisterEvent> onRegisterLate = this::onRegisterLate;
-        bus.addListener(onRegister);
-        bus.addListener(EventPriority.LOWEST, onRegisterLate);
-        bus.addListener(this::onBuildCreativeModeTabContents); // Fired multiple times when ever tabs need contents rebuilt (changing op tab perms for example)
-        
-        // Register events fire multiple times, so clean them up on common setup
-        OneTimeEventReceiver.addModListener(this, FMLCommonSetupEvent.class, $ -> {
-            OneTimeEventReceiver.unregister(this, onRegister, RegisterEvent.class);
-            OneTimeEventReceiver.unregister(this, onRegisterLate, RegisterEvent.class);
+    public S registerEventListeners() {
+        RegistryUtil.forAllRegistries(registry -> {
+            onRegister(registry);
+            onRegisterLate(registry);
         });
 
+        ItemGroupEvents.MODIFY_ENTRIES_ALL.register((group, entries) -> {
+            onBuildCreativeModeTabContents(group, entries); // Fired multiple times when ever tabs need contents rebuilt (changing op tab perms for example)
+        });
+        
+        // Register events fire multiple times, so clean them up on common setup
+        /*OneTimeEventReceiver.addModListener(this, FMLCommonSetupEvent.class, $ -> {
+            OneTimeEventReceiver.unregister(this, onRegister, RegisterEvent.class);
+            OneTimeEventReceiver.unregister(this, onRegisterLate, RegisterEvent.class);
+        });*/
+
         if (doDatagen.get()) {
-            OneTimeEventReceiver.addModListener(this, GatherDataEvent.class, this::onData);
+            //OneTimeEventReceiver.addModListener(this, GatherDataEvent.class, this::onData);
         }
 
         return self();
@@ -246,13 +255,13 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
      * Called once per registry to gather collected registrations and add entries to the registry. May be overriden in custom implementations to perform additional actions upon entry registration, but
      * <i>must</i> call {@code super}.
      * 
-     * @param event
+     * @param registry
      *            The {@link RegisterEvent} being fired, use {@link RegisterEvent#getRegistryKey()} to query the registry type
      */
-    protected void onRegister(RegisterEvent event) {
-        ResourceKey<? extends Registry<?>> type = event.getRegistryKey();
+    protected void onRegister(Registry<?> registry) {
+        ResourceKey<? extends Registry<?>> type = registry.key();
         if (type == null) {
-            log.debug(DebugMarkers.REGISTER, "Skipping invalid registry with no supertype: " + event.getRegistryKey().location());
+            log.debug(DebugMarkers.REGISTER, "Skipping invalid registry with no supertype: " + registry.key().location());
             return;
         }
         if (!registerCallbacks.isEmpty()) {
@@ -267,10 +276,10 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
             log.trace(DebugMarkers.REGISTER, "({}) Registering {} known objects of type {}", getModid(), registrationsForType.size(), type.location());
             for (Entry<String, Registration<?, ?>> e : registrationsForType.entrySet()) {
                 try {
-                    e.getValue().register(event);
-                    log.trace(DebugMarkers.REGISTER, "Registered {} to registry {}", e.getValue().getName(), event.getRegistryKey().location());
+                    e.getValue().register((Registry) registry);
+                    log.trace(DebugMarkers.REGISTER, "Registered {} to registry {}", e.getValue().getName(), registry.key().location());
                 } catch (Exception ex) {
-                    String err = "Unexpected error while registering entry " + e.getValue().getName() + " to registry " + event.getRegistryKey().location();
+                    String err = "Unexpected error while registering entry " + e.getValue().getName() + " to registry " + registry.key().location();
                     if (skipErrors) {
                         log.error(DebugMarkers.REGISTER, err);
                     } else {
@@ -288,8 +297,8 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
      * @param event
      *            The {@link RegisterEvent} being fired, use {@link RegisterEvent#getRegistryKey()} to query the registry type
      */
-    protected void onRegisterLate(RegisterEvent event) {
-        ResourceKey<? extends Registry<?>> type = event.getRegistryKey();
+    protected void onRegisterLate(Registry<?> registry) {
+        ResourceKey<? extends Registry<?>> type = registry.key();
         Collection<Runnable> callbacks = afterRegisterCallbacks.get(type);
         callbacks.forEach(Runnable::run);
         callbacks.clear();
@@ -302,11 +311,11 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
      * @param event
      *            The event
      */
-    protected void onBuildCreativeModeTabContents(BuildCreativeModeTabContentsEvent event) {
-        var modifier = new CreativeModeTabModifier(event::getFlags, event::hasPermissions, event::accept, event::getParameters);
+    protected void onBuildCreativeModeTabContents(CreativeModeTab tab, FabricItemGroupEntries entries) {
+        var modifier = new CreativeModeTabModifier(entries.getContext()::enabledFeatures, entries.getContext()::hasPermissions, entries::accept, entries::getContext);
 
         creativeModeTabModifiers.forEach((key, value) -> {
-            if(event.getTabKey().equals(key)) value.accept(modifier);
+            if(BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab).equals(key)) value.accept(modifier);
         });
     }
 
@@ -314,13 +323,13 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
     private RegistrateDataProvider provider;
 
     /**
-     * Called when datagen begins to add our provider to the generator. Can be overriden in custom implementations.
+     * Must be called when datagen begins to add our provider to the generator. Can be overriden in custom implementations.
      * 
      * @param event
      *            The event
      */
-    protected void onData(GatherDataEvent event) {
-        event.getGenerator().addProvider(true, provider = new RegistrateDataProvider(this, modid, event));
+    public void onData(FabricDataGenerator.Pack pack, ExistingFileHelper fileHelper) {
+        pack.addProvider((output, registriesFuture) -> provider = new RegistrateDataProvider(this, modid, new FabricDatagenInfo(output, fileHelper, registriesFuture)));
     }
 
     /**
@@ -581,7 +590,7 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
      */
     public <T extends RegistrateProvider> S addDataGenerator(ProviderType<? extends T> type, NonNullConsumer<? extends T> cons) {
         if (doDatagen.get()) {
-            if (provider != null) throw new IllegalStateException("Cannot add data generator after construction of root generator");
+            //if (provider != null) throw new IllegalStateException("Cannot add data generator after construction of root generator"); // Fabric: no
             datagens.put(type, cons);
         }
         return self();
@@ -908,7 +917,8 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
      */
     public <R> ResourceKey<Registry<R>> makeRegistry(String name, Function<ResourceKey<Registry<R>>, RegistryBuilder<R>> builder) {
         final ResourceKey<Registry<R>> registryId = ResourceKey.createRegistryKey(ResourceLocation.fromNamespaceAndPath(getModid(), name));
-        OneTimeEventReceiver.addModListener(this, NewRegistryEvent.class, e -> e.register(builder.apply(registryId).create()));
+        builder.apply(registryId).create();
+        //OneTimeEventReceiver.addModListener(this, NewRegistryEvent.class, e -> e.register(builder.apply(registryId).create()));
         return registryId;
     }
 
@@ -946,7 +956,11 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
      */
     public <R> ResourceKey<Registry<R>> makeDatapackRegistry(String name, Codec<R> codec, @Nullable Codec<R> networkCodec) {
         final ResourceKey<Registry<R>> registryId = ResourceKey.createRegistryKey(ResourceLocation.fromNamespaceAndPath(getModid(), name));
-        OneTimeEventReceiver.addModListener(this, DataPackRegistryEvent.NewRegistry.class, event -> event.dataPackRegistry(registryId, codec, networkCodec));
+        if (networkCodec != null)
+            DynamicRegistries.registerSynced(registryId, codec, networkCodec);
+        else
+            DynamicRegistries.registerSynced(registryId, codec);
+        //OneTimeEventReceiver.addModListener(this, DataPackRegistryEvent.NewRegistry.class, event -> event.dataPackRegistry(registryId, codec, networkCodec));
         return registryId;
     }
 
@@ -1219,36 +1233,36 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
 
     // Menu
 
-    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>> MenuBuilder<T, SC, S> menu(MenuFactory<T> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory) {
+    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>, D> MenuBuilder<T, SC, S, D> menu(MenuFactory<T> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory) {
         return menu(currentName(), factory, screenFactory);
     }
 
-    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>> MenuBuilder<T, SC, S> menu(String name, MenuFactory<T> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory) {
+    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>, D> MenuBuilder<T, SC, S, D> menu(String name, MenuFactory<T> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory) {
         return menu(self(), name, factory, screenFactory);
     }
 
-    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>, P> MenuBuilder<T, SC, P> menu(P parent, MenuFactory<T> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory) {
+    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>, P, D> MenuBuilder<T, SC, P, D> menu(P parent, MenuFactory<T> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory) {
         return menu(parent, currentName(), factory, screenFactory);
     }
 
-    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>, P> MenuBuilder<T, SC, P> menu(P parent, String name, MenuFactory<T> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory) {
-        return entry(name, callback -> new MenuBuilder<T, SC, P>(this, parent, name, callback, factory, screenFactory));
+    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>, P, D> MenuBuilder<T, SC, P, D> menu(P parent, String name, MenuFactory<T> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory) {
+        return entry(name, callback -> new MenuBuilder<T, SC, P, D>(this, parent, name, callback, factory, screenFactory));
     }
 
-    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>> MenuBuilder<T, SC, S> menu(ForgeMenuFactory<T> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory) {
-        return menu(currentName(), factory, screenFactory);
+    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>, D> MenuBuilder<T, SC, S, D> menu(FabricMenuFactory<T, D> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory, StreamCodec<RegistryFriendlyByteBuf, D> codec) {
+        return menu(currentName(), factory, screenFactory, codec);
     }
 
-    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>> MenuBuilder<T, SC, S> menu(String name, ForgeMenuFactory<T> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory) {
-        return menu(self(), name, factory, screenFactory);
+    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>, D> MenuBuilder<T, SC, S, D> menu(String name, FabricMenuFactory<T, D> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory, StreamCodec<RegistryFriendlyByteBuf, D> codec) {
+        return menu(self(), name, factory, screenFactory, codec);
     }
 
-    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>, P> MenuBuilder<T, SC, P> menu(P parent, ForgeMenuFactory<T> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory) {
-        return menu(parent, currentName(), factory, screenFactory);
+    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>, P, D> MenuBuilder<T, SC, P, D> menu(P parent, FabricMenuFactory<T, D> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory, StreamCodec<RegistryFriendlyByteBuf, D> codec) {
+        return menu(parent, currentName(), factory, screenFactory, codec);
     }
 
-    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>, P> MenuBuilder<T, SC, P> menu(P parent, String name, ForgeMenuFactory<T> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory) {
-        return entry(name, callback -> new MenuBuilder<T, SC, P>(this, parent, name, callback, factory, screenFactory));
+    public <T extends AbstractContainerMenu, SC extends Screen & MenuAccess<T>, P, D> MenuBuilder<T, SC, P, D> menu(P parent, String name, FabricMenuFactory<T, D> factory, NonNullSupplier<ScreenFactory<T, SC>> screenFactory, StreamCodec<RegistryFriendlyByteBuf, D> codec) {
+        return entry(name, callback -> new MenuBuilder<T, SC, P, D>(this, parent, name, callback, factory, screenFactory, codec));
     }
 
     // Creative Tab
@@ -1269,22 +1283,22 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
         return defaultCreativeTab(parent, name, tab -> {});
     }
 
-    public NoConfigBuilder<CreativeModeTab, CreativeModeTab, S> defaultCreativeTab(Consumer<CreativeModeTab.Builder> config) {
+    public NoConfigBuilder<CreativeModeTab, CreativeModeTab, S> defaultCreativeTab(Consumer<PortingLibCreativeTab.PortingLibCreativeTabBuilder> config) {
         return defaultCreativeTab(self(), config);
     }
 
-    public NoConfigBuilder<CreativeModeTab, CreativeModeTab, S> defaultCreativeTab(String name, Consumer<CreativeModeTab.Builder> config) {
+    public NoConfigBuilder<CreativeModeTab, CreativeModeTab, S> defaultCreativeTab(String name, Consumer<PortingLibCreativeTab.PortingLibCreativeTabBuilder> config) {
         return defaultCreativeTab(self(), name, config);
     }
 
-    public <P> NoConfigBuilder<CreativeModeTab, CreativeModeTab, P> defaultCreativeTab(P parent, Consumer<CreativeModeTab.Builder> config) {
+    public <P> NoConfigBuilder<CreativeModeTab, CreativeModeTab, P> defaultCreativeTab(P parent, Consumer<PortingLibCreativeTab.PortingLibCreativeTabBuilder> config) {
         return defaultCreativeTab(parent, currentName(), config);
     }
 
-    public <P> NoConfigBuilder<CreativeModeTab, CreativeModeTab, P> defaultCreativeTab(P parent, String name, Consumer<CreativeModeTab.Builder> config) {
+    public <P> NoConfigBuilder<CreativeModeTab, CreativeModeTab, P> defaultCreativeTab(P parent, String name, Consumer<PortingLibCreativeTab.PortingLibCreativeTabBuilder> config) {
         this.defaultCreativeModeTab = ResourceKey.create(Registries.CREATIVE_MODE_TAB, ResourceLocation.fromNamespaceAndPath(this.modid, name));
         return this.generic(parent, name, Registries.CREATIVE_MODE_TAB, () -> {
-            var builder = CreativeModeTab.builder()
+            var builder = (PortingLibCreativeTab.PortingLibCreativeTabBuilder) PortingLibCreativeTab.builder()
                     .icon(() -> getAll(Registries.ITEM).stream().findFirst().map(ItemEntry::cast).map(ItemEntry::asStack).orElse(new ItemStack(Items.AIR)))
                     .title(this.addLang("itemGroup", this.defaultCreativeModeTab.location(), RegistrateLangProvider.toEnglishName(name)));
             config.accept(builder);

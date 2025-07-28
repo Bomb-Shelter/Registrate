@@ -1,12 +1,14 @@
 package com.tterrag.registrate.providers.loot;
 
 import com.tterrag.registrate.AbstractRegistrate;
+import io.github.fabricators_of_create.porting_lib.data.ModdedBlockLootSubProvider;
 import lombok.RequiredArgsConstructor;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.loot.BlockLootSubProvider;
 import net.minecraft.data.loot.packs.VanillaBlockLoot;
+import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.block.Block;
@@ -17,24 +19,25 @@ import net.minecraft.world.level.storage.loot.predicates.ConditionUserBuilder;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 import net.minecraft.world.level.storage.loot.providers.number.NumberProvider;
 
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import javax.annotation.Generated;
 
-public class RegistrateBlockLootTables extends VanillaBlockLoot implements RegistrateLootTables {
+public class RegistrateBlockLootTables extends ModdedBlockLootSubProvider implements RegistrateLootTables {
     private final AbstractRegistrate<?> parent;
     private final Consumer<RegistrateBlockLootTables> callback;
 
     public RegistrateBlockLootTables(HolderLookup.Provider provider, AbstractRegistrate<?> parent, Consumer<RegistrateBlockLootTables> callback) {
-        super(provider);
+        super(Set.of(), FeatureFlags.REGISTRY.allFlags(), provider);
         this.parent = parent;
         this.callback = callback;
     }
 
     @Override
-    protected void generate() {
+    public void generate() {
         callback.accept(this);
     }
 

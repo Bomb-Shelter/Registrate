@@ -15,6 +15,15 @@ import com.tterrag.registrate.util.DataIngredient;
 import com.tterrag.registrate.util.entry.*;
 import com.tterrag.registrate.util.nullness.NonnullType;
 
+import io.github.fabricators_of_create.porting_lib.data.DatapackBuiltinEntriesProvider;
+import io.github.fabricators_of_create.porting_lib.data.ExistingFileHelper;
+import io.github.fabricators_of_create.porting_lib.fluids.BaseFlowingFluid;
+import io.github.fabricators_of_create.porting_lib.fluids.FluidType;
+import io.github.fabricators_of_create.porting_lib.registry.RegistryBuilder;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.datagen.v1.DataGeneratorEntrypoint;
+import net.fabricmc.fabric.api.datagen.v1.FabricDataGenerator;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementType;
 import net.minecraft.advancements.critereon.InventoryChangeTrigger;
@@ -84,18 +93,8 @@ import net.minecraft.world.level.storage.loot.functions.SetItemCountFunction;
 import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 import net.minecraft.world.level.storage.loot.providers.number.UniformGenerator;
 import net.minecraft.world.phys.BlockHitResult;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
-import net.neoforged.neoforge.common.data.DatapackBuiltinEntriesProvider;
-import net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent;
-import net.neoforged.neoforge.fluids.BaseFlowingFluid;
-import net.neoforged.neoforge.fluids.FluidType;
-import net.neoforged.neoforge.registries.RegistryBuilder;
 
-@Mod("testmod")
-public class TestMod {
+public class TestMod implements ModInitializer, DataGeneratorEntrypoint {
 
     private class TestBlock extends Block implements EntityBlock {
 
@@ -241,7 +240,7 @@ public class TestMod {
             .entity(TestEntity::new, MobCategory.CREATURE)
             .attributes(Pig::createAttributes)
             .renderer(() -> PigRenderer::new)
-            .spawnPlacement(SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Animal::checkAnimalSpawnRules, RegisterSpawnPlacementsEvent.Operation.OR)
+            .spawnPlacement(SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Animal::checkAnimalSpawnRules/*, RegisterSpawnPlacementsEvent.Operation.OR*/)
             .defaultSpawnEgg(0xFF0000, 0x00FF00)
             .loot((prov, type) -> prov.add(type, LootTable.lootTable()
                     .withPool(LootPool.lootPool()
@@ -260,7 +259,7 @@ public class TestMod {
     private final FluidEntry<BaseFlowingFluid.Flowing> testfluid = registrate.object("testfluid")
             .fluid(ResourceLocation.withDefaultNamespace("block/water_flow"), ResourceLocation.withDefaultNamespace("block/lava_still"), (props, still, flow) -> new FluidType(props) {
                 // And now you can do custom behaviours.
-                @Override
+                /*@Override
                 public void initializeClient(Consumer<IClientFluidTypeExtensions> consumer) {
                     consumer.accept(new IClientFluidTypeExtensions() {
                         @Override
@@ -273,7 +272,7 @@ public class TestMod {
                             return flow;
                         }
                     });
-                }
+                }*/
             })
             .properties(p -> p.lightLevel(15).canConvertToSource(true))
             .renderType(() -> RenderType::translucent)
@@ -348,7 +347,8 @@ public class TestMod {
         return builder.loot((prov, block) -> prov.dropOther(block, Items.DIAMOND));
     }
 
-    public TestMod(IEventBus eventBus) {
+    @Override
+    public void onInitialize() {
 
         registrate.addRawLang("testmod.custom.lang", "Test");
         registrate.addLang("tooltip", testblock.getId(), "Egg.");
@@ -421,10 +421,12 @@ public class TestMod {
             );
         }));
 
-        eventBus.addListener(this::onCommonSetup);
+        registrate.registerEventListeners();
+
+        this.onCommonSetup();
     }
 
-    private void onCommonSetup(FMLCommonSetupEvent event) {
+    private void onCommonSetup() {
         if (!sawCallback.get()) {
             throw new IllegalStateException("Register callback not fired!");
         }
@@ -434,5 +436,12 @@ public class TestMod {
         testblockitem.is(Items.STONE);
         testblockbe.is(BlockEntityType.CHEST);
         // testbiome.is(Feature.BAMBOO); // should not compile
+    }
+
+    @Override
+    public void onInitializeDataGenerator(FabricDataGenerator fabricDataGenerator) {
+        FabricDataGenerator.Pack pack = fabricDataGenerator.createPack();
+        ExistingFileHelper helper = ExistingFileHelper.withResourcesFromArg();
+        registrate.onData(pack, helper);
     }
 }

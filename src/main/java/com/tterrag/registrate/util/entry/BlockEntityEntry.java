@@ -6,12 +6,12 @@ import javax.annotation.Nullable;
 
 import com.tterrag.registrate.AbstractRegistrate;
 
+import io.github.fabricators_of_create.porting_lib.registry.DeferredHolder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.registries.DeferredHolder;
 
 public class BlockEntityEntry<T extends BlockEntity> extends RegistryEntry<BlockEntityType<?>, BlockEntityType<T>> {
 

@@ -10,13 +10,16 @@ import com.tterrag.registrate.providers.RegistrateProvider;
 import com.tterrag.registrate.util.nullness.NonNullBiFunction;
 import com.tterrag.registrate.util.nullness.NonNullConsumer;
 
+import io.github.fabricators_of_create.porting_lib.data.ModdedLootTableProvider;
 import lombok.Getter;
+import net.fabricmc.api.EnvType;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.WritableRegistry;
 import net.minecraft.data.CachedOutput;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.loot.LootTableProvider;
+import net.minecraft.data.loot.LootTableProvider.SubProviderEntry;
 import net.minecraft.data.loot.LootTableSubProvider;
 import net.minecraft.data.loot.packs.VanillaLootTableProvider;
 import net.minecraft.resources.ResourceKey;
@@ -26,8 +29,6 @@ import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.ValidationContext;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSet;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
-import net.neoforged.fml.LogicalSide;
-import net.neoforged.fml.util.ObfuscationReflectionHelper;
 import org.apache.commons.lang3.function.TriFunction;
 
 import java.util.*;
@@ -36,7 +37,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-public class RegistrateLootTableProvider extends LootTableProvider implements RegistrateProvider {
+public class RegistrateLootTableProvider extends ModdedLootTableProvider implements RegistrateProvider {
 
     public interface LootType<T extends RegistrateLootTables> {
 
@@ -75,7 +76,7 @@ public class RegistrateLootTableProvider extends LootTableProvider implements Re
     private CompletableFuture<HolderLookup.Provider> provider;
 
     public RegistrateLootTableProvider(AbstractRegistrate<?> parent, PackOutput packOutput, CompletableFuture<HolderLookup.Provider> provider) {
-        super(packOutput, Set.of(), VanillaLootTableProvider.create(packOutput, provider).getTables(), provider);
+        super(packOutput, Set.of(), VanillaLootTableProvider.create(packOutput, provider).subProviders, provider);
         this.parent = parent;
         this.provider = provider;
     }
@@ -89,8 +90,8 @@ public class RegistrateLootTableProvider extends LootTableProvider implements Re
     }
 
     @Override
-    public LogicalSide getSide() {
-        return LogicalSide.SERVER;
+    public EnvType getSide() {
+        return EnvType.SERVER;
     }
 
     @Override
@@ -113,7 +114,7 @@ public class RegistrateLootTableProvider extends LootTableProvider implements Re
         return creator;
     }
 
-    private static final BiMap<ResourceLocation, LootContextParamSet> SET_REGISTRY = ObfuscationReflectionHelper.getPrivateValue(LootContextParamSets.class, null, "REGISTRY");
+    private static final BiMap<ResourceLocation, LootContextParamSet> SET_REGISTRY = LootContextParamSets.REGISTRY;
 
     @Override
     public List<LootTableProvider.SubProviderEntry> getTables() {

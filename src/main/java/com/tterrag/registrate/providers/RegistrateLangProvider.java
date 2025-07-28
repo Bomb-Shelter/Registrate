@@ -3,8 +3,8 @@ package com.tterrag.registrate.providers;
 import com.tterrag.registrate.AbstractRegistrate;
 import com.tterrag.registrate.util.nullness.NonNullSupplier;
 import com.tterrag.registrate.util.nullness.NonnullType;
-import net.neoforged.fml.LogicalSide;
-import net.neoforged.neoforge.common.data.LanguageProvider;
+import io.github.fabricators_of_create.porting_lib.data.LanguageProvider;
+import net.fabricmc.api.EnvType;
 import org.apache.commons.lang3.StringUtils;
 
 import net.minecraft.core.Registry;
@@ -55,8 +55,8 @@ public class RegistrateLangProvider extends LanguageProvider implements Registra
     }
 
     @Override
-    public LogicalSide getSide() {
-        return LogicalSide.CLIENT;
+    public EnvType getSide() {
+        return EnvType.CLIENT;
     }
 
     @Override

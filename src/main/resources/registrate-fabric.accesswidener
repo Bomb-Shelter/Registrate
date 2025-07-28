@@ -1,0 +1,17 @@
+accessWidener	v2	named
+
+transitive-accessible class net/minecraft/world/level/block/entity/BlockEntityType$BlockEntitySupplier
+transitive-accessible method net/minecraft/world/item/crafting/Ingredient <init> (Ljava/util/stream/Stream;)V
+transitive-extendable class net/minecraft/world/item/crafting/Ingredient
+transitive-extendable class net/minecraft/data/tags/TagsProvider
+transitive-accessible field net/minecraft/client/renderer/block/model/BlockModel$GuiLight name Ljava/lang/String;
+transitive-accessible class net/minecraft/client/renderer/block/model/ItemTransform$Deserializer
+transitive-accessible method net/minecraft/client/renderer/block/model/BlockElement uvsByFace (Lnet/minecraft/core/Direction;)[F
+transitive-accessible field net/minecraft/client/Minecraft RESOURCE_RELOAD_INITIAL_TASK Ljava/util/concurrent/CompletableFuture;
+transitive-extendable method net/minecraft/data/tags/TagsProvider getName ()Ljava/lang/String;
+
+extendable method net/minecraft/data/loot/BlockLootSubProvider createSilkTouchOnlyTable (Lnet/minecraft/world/level/ItemLike;)Lnet/minecraft/world/level/storage/loot/LootTable$Builder;
+extendable method net/minecraft/data/loot/BlockLootSubProvider createPotFlowerItemTable (Lnet/minecraft/world/level/ItemLike;)Lnet/minecraft/world/level/storage/loot/LootTable$Builder;
+accessible method net/minecraft/data/loot/EntityLootSubProvider canHaveLootTable (Lnet/minecraft/world/entity/EntityType;)Z
+accessible field net/minecraft/data/loot/LootTableProvider subProviders Ljava/util/List;
+accessible field net/minecraft/world/level/storage/loot/parameters/LootContextParamSets REGISTRY Lcom/google/common/collect/BiMap;

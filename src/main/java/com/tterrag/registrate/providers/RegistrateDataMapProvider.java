@@ -1,11 +1,10 @@
 package com.tterrag.registrate.providers;
 
 import com.tterrag.registrate.AbstractRegistrate;
+import io.github.fabricators_of_create.porting_lib.data.DataMapProvider;
+import net.fabricmc.api.EnvType;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
-import net.neoforged.fml.LogicalSide;
-import net.neoforged.neoforge.common.data.DataMapProvider;
-import net.neoforged.neoforge.registries.datamaps.DataMapType;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -19,12 +18,12 @@ public class RegistrateDataMapProvider extends DataMapProvider implements Regist
 	}
 
 	@Override
-	public LogicalSide getSide() {
-		return LogicalSide.SERVER;
+	public EnvType getSide() {
+		return EnvType.SERVER;
 	}
 
 	@Override
-	protected void gather() {
+	protected void gather(HolderLookup.Provider provider) {
 		parent.genData(ProviderType.DATA_MAP, this);
 	}
 

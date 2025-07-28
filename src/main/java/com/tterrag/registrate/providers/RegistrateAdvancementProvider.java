@@ -4,9 +4,13 @@ import com.google.common.collect.Lists;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.tterrag.registrate.AbstractRegistrate;
+import io.github.fabricators_of_create.porting_lib.resources.conditions.ConditionalOps;
+import io.github.fabricators_of_create.porting_lib.resources.conditions.ICondition;
+import io.github.fabricators_of_create.porting_lib.resources.conditions.WithConditions;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 
+import net.fabricmc.api.EnvType;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.core.Holder;
@@ -17,9 +21,6 @@ import net.minecraft.data.PackOutput;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.fml.LogicalSide;
-import net.neoforged.neoforge.common.conditions.ICondition;
-import net.neoforged.neoforge.common.conditions.WithConditions;
 
 import javax.annotation.Nullable;
 import java.nio.file.Path;
@@ -54,8 +55,8 @@ public class RegistrateAdvancementProvider implements RegistrateProvider, Consum
     }
 
     @Override
-    public LogicalSide getSide() {
-        return LogicalSide.SERVER;
+    public EnvType getSide() {
+        return EnvType.SERVER;
     }
 
     public MutableComponent title(String category, String name, String title) {
@@ -105,7 +106,7 @@ public class RegistrateAdvancementProvider implements RegistrateProvider, Consum
             } else if (conditions.isEmpty()) {
                 advancementsToSave.add(DataProvider.saveStable(cache, lookup, Advancement.CODEC, holder.value(), path));
             } else {
-                advancementsToSave.add(DataProvider.saveStable(cache, lookup, Advancement.CONDITIONAL_CODEC,
+                advancementsToSave.add(DataProvider.saveStable(cache, lookup, ConditionalOps.createConditionalCodecWithConditions(Advancement.CODEC),
                         Optional.of(new WithConditions<>(conditions, holder.value())), path));
             }
         });

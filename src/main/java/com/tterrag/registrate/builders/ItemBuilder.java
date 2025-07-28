@@ -15,7 +15,7 @@ import com.tterrag.registrate.providers.RegistrateItemModelProvider;
 import com.tterrag.registrate.providers.RegistrateLangProvider;
 import com.tterrag.registrate.providers.RegistrateRecipeProvider;
 import com.tterrag.registrate.util.CreativeModeTabModifier;
-import com.tterrag.registrate.util.OneTimeEventReceiver;
+
 import com.tterrag.registrate.util.RegistrateDistExecutor;
 import com.tterrag.registrate.util.entry.ItemEntry;
 import com.tterrag.registrate.util.entry.RegistryEntry;
@@ -24,20 +24,18 @@ import com.tterrag.registrate.util.nullness.NonNullFunction;
 import com.tterrag.registrate.util.nullness.NonNullSupplier;
 import com.tterrag.registrate.util.nullness.NonNullUnaryOperator;
 
+import io.github.fabricators_of_create.porting_lib.registry.DeferredHolder;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.fabric.api.client.rendering.v1.ColorProviderRegistry;
+import net.fabricmc.fabric.api.registry.CompostingChanceRegistry;
+import net.fabricmc.fabric.api.registry.FuelRegistry;
 import net.minecraft.client.color.item.ItemColor;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
-import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
-import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
-import net.neoforged.neoforge.registries.DeferredHolder;
-import net.neoforged.neoforge.registries.datamaps.builtin.Compostable;
-import net.neoforged.neoforge.registries.datamaps.builtin.FurnaceFuel;
-import net.neoforged.neoforge.registries.datamaps.builtin.NeoForgeDataMaps;
+import net.minecraft.world.level.block.ComposterBlock;
 
 /**
  * A builder for items, allows for customization of the {@link Item.Properties} and configuration of data associated with items (models, recipes, etc.).
@@ -204,19 +202,16 @@ public class ItemBuilder<T extends Item, P> extends AbstractBuilder<Item, T, P, 
      */
     public ItemBuilder<T, P> color(NonNullSupplier<Supplier<ItemColor>> colorHandler) {
         if (this.colorHandler == null) {
-            RegistrateDistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> this::registerItemColor);
+            RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> this::registerItemColor);
         }
         this.colorHandler = colorHandler;
         return this;
     }
 
     protected void registerItemColor() {
-        OneTimeEventReceiver.addModListener(getOwner(), RegisterColorHandlersEvent.Item.class, e -> {
-            NonNullSupplier<Supplier<ItemColor>> colorHandler = this.colorHandler;
-            if (colorHandler != null) {
-                e.register(colorHandler.get().get(), getEntry());
-            }
-        });
+        if (colorHandler != null) {
+            ColorProviderRegistry.ITEM.register(colorHandler.get().get(), getEntry());
+        }
     }
 
     /**
@@ -278,7 +273,9 @@ public class ItemBuilder<T extends Item, P> extends AbstractBuilder<Item, T, P, 
      * @param tick time in ticks for this item to burn in furnace.
      */
     public ItemBuilder<T, P> burnTime(int tick) {
-        return dataMap(NeoForgeDataMaps.FURNACE_FUELS, new FurnaceFuel(tick));
+        //return dataMap(NeoForgeDataMaps.FURNACE_FUELS, new FurnaceFuel(tick));
+        FuelRegistry.INSTANCE.add(getEntry(), tick);
+        return this;
     }
 
     /**
@@ -286,11 +283,13 @@ public class ItemBuilder<T extends Item, P> extends AbstractBuilder<Item, T, P, 
      * @param chance chance for composter to increase one level when composting this item.
      */
     public ItemBuilder<T, P> compostable(float chance) {
-        return dataMap(NeoForgeDataMaps.COMPOSTABLES, new Compostable(chance));
+        //return dataMap(NeoForgeDataMaps.COMPOSTABLES, new Compostable(chance));
+        CompostingChanceRegistry.INSTANCE.add(getEntry(), chance);
+        return this;
     }
 
-    @Nullable
-    private Function<T, NonNullSupplier<Supplier<IClientItemExtensions>>> clientExtensionFunc;
+    //@Nullable
+    //private Function<T, NonNullSupplier<Supplier<IClientItemExtensions>>> clientExtensionFunc;
 
     /**
      * Register a client extension for this item. The {@link IClientItemExtensions} instance can be shared across many items.
@@ -299,9 +298,9 @@ public class ItemBuilder<T extends Item, P> extends AbstractBuilder<Item, T, P, 
      *            The client extension to register for this item
      * @return this {@link ItemBuilder}
      */
-    public ItemBuilder<T, P> clientExtension(NonNullSupplier<Supplier<IClientItemExtensions>> clientExtension) {
+    /*public ItemBuilder<T, P> clientExtension(NonNullSupplier<Supplier<IClientItemExtensions>> clientExtension) {
         if (this.clientExtensionFunc == null) {
-            RegistrateDistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> this::registerClientExtension);
+            RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> this::registerClientExtension);
         }
         this.clientExtensionFunc = item -> clientExtension;
         return this;
@@ -310,7 +309,7 @@ public class ItemBuilder<T extends Item, P> extends AbstractBuilder<Item, T, P, 
     @Deprecated(forRemoval = true)
     public ItemBuilder<T, P> clientExtension(Function<T, NonNullSupplier<Supplier<IClientItemExtensions>>> clientExtension) {
         if (this.clientExtensionFunc == null) {
-            RegistrateDistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> this::registerClientExtension);
+            RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> this::registerClientExtension);
         }
         this.clientExtensionFunc = clientExtension;
         return this;
@@ -323,7 +322,7 @@ public class ItemBuilder<T extends Item, P> extends AbstractBuilder<Item, T, P, 
                 e.registerItem(clientExtension.get().get(), getEntry());
             }
         });
-    }
+    }*/
 
     /**
      * Assign {@link TagKey}{@code s} to this item. Multiple calls will add additional tags.

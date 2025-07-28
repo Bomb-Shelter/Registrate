@@ -9,9 +9,10 @@ import com.tterrag.registrate.util.nullness.NonNullBiConsumer;
 import com.tterrag.registrate.util.nullness.NonNullConsumer;
 import com.tterrag.registrate.util.nullness.NonNullFunction;
 import com.tterrag.registrate.util.nullness.NonNullSupplier;
+import io.github.fabricators_of_create.porting_lib.registry.DeferredHolder;
+import io.github.fabricators_of_create.porting_lib.resources.data_maps.DataMapType;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
-import net.neoforged.neoforge.registries.datamaps.DataMapType;
 
 import java.util.function.Function;
 
@@ -227,7 +228,7 @@ public interface Builder<R, T extends R, P, S extends Builder<R, T, P, S>> exten
     }
 
     /**
-     * Register the entry and return the parent object. The {@link net.neoforged.neoforge.registries.DeferredHolder} will be created but not returned. It can be retrieved later with {@link AbstractRegistrate#get(ResourceKey)} or
+     * Register the entry and return the parent object. The {@link DeferredHolder} will be created but not returned. It can be retrieved later with {@link AbstractRegistrate#get(ResourceKey)} or
      * {@link AbstractRegistrate#get(String, ResourceKey)}.
      * 
      * @return the parent object

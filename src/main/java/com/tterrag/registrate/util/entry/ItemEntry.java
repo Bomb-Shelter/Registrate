@@ -2,8 +2,8 @@ package com.tterrag.registrate.util.entry;
 
 import com.tterrag.registrate.AbstractRegistrate;
 
+import io.github.fabricators_of_create.porting_lib.registry.DeferredHolder;
 import net.minecraft.world.item.Item;
-import net.neoforged.neoforge.registries.DeferredHolder;
 
 public class ItemEntry<T extends Item> extends ItemProviderEntry<Item, T> {
 

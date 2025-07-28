@@ -1,13 +1,14 @@
 package com.tterrag.registrate.providers;
 
 import com.tterrag.registrate.AbstractRegistrate;
+import com.tterrag.registrate.fabric.FabricDatagenInfo;
+import io.github.fabricators_of_create.porting_lib.data.ExistingFileHelper;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.fabric.api.datagen.v1.FabricDataOutput;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.CachedOutput;
 import net.minecraft.data.DataProvider;
 import net.minecraft.data.PackOutput;
-import net.neoforged.fml.LogicalSide;
-import net.neoforged.neoforge.common.data.ExistingFileHelper;
-import net.neoforged.neoforge.data.event.GatherDataEvent;
 import org.apache.commons.compress.utils.Lists;
 import org.jetbrains.annotations.ApiStatus;
 
@@ -18,23 +19,23 @@ import java.util.concurrent.CompletableFuture;
 public final class RegistrateGenericProvider implements RegistrateProvider
 {
     private final AbstractRegistrate<?> registrate;
-    private final PackOutput output;
+    private final FabricDataOutput output;
     private final CompletableFuture<HolderLookup.Provider> registries;
     private final ExistingFileHelper existingFileHelper;
-    private final LogicalSide side;
+    private final EnvType side;
     private final ProviderType<RegistrateGenericProvider> providerType;
     private final List<Generator> generators = Lists.newArrayList();
 
     @ApiStatus.Internal
-    RegistrateGenericProvider(AbstractRegistrate<?> registrate, GatherDataEvent event, LogicalSide side, ProviderType<RegistrateGenericProvider> providerType)
+    RegistrateGenericProvider(AbstractRegistrate<?> registrate, FabricDatagenInfo info, EnvType side, ProviderType<RegistrateGenericProvider> providerType)
     {
         this.registrate = registrate;
         this.side = side;
         this.providerType = providerType;
 
-        output = event.getGenerator().getPackOutput();
-        registries = event.getLookupProvider();
-        existingFileHelper = event.getExistingFileHelper();
+        output = info.packOutput();
+        registries = info.lookupProvider();
+        existingFileHelper = info.existingFileHelper();
     }
 
     public RegistrateGenericProvider add(Generator generator)
@@ -44,7 +45,7 @@ public final class RegistrateGenericProvider implements RegistrateProvider
     }
 
     @Override
-    public LogicalSide getSide()
+    public EnvType getSide()
     {
         return side;
     }
@@ -69,7 +70,7 @@ public final class RegistrateGenericProvider implements RegistrateProvider
         return "generic_%s_provider".formatted(side.name().toLowerCase(Locale.ROOT));
     }
 
-    public record GeneratorData(PackOutput output, CompletableFuture<HolderLookup.Provider> registries, ExistingFileHelper existingFileHelper)
+    public record GeneratorData(FabricDataOutput output, CompletableFuture<HolderLookup.Provider> registries, ExistingFileHelper existingFileHelper)
     {
     }
 

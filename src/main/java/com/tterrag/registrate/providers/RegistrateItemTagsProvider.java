@@ -1,6 +1,7 @@
 package com.tterrag.registrate.providers;
 
 import com.tterrag.registrate.AbstractRegistrate;
+import io.github.fabricators_of_create.porting_lib.data.ExistingFileHelper;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.PackOutput;
@@ -9,7 +10,6 @@ import net.minecraft.tags.TagBuilder;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
-import net.neoforged.neoforge.common.data.ExistingFileHelper;
 
 import java.util.HashMap;
 import java.util.Map;

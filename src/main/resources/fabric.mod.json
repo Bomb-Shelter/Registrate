@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "registrate-fabric",
+  "version": "${version}",
+  "name": "Registrate for Fabric",
+  "description": "Fabric port of Registrate. Helper library to make creating and registering objects simpler.",
+  "authors": [
+    "tterrag1098",
+	"Pepper_Bell",
+    "AlphaMode",
+    "TropheusJ",
+    "BluSpring"
+  ],
+  "contact": {
+    "sources": "https://github.com/Fabricators-of-Create/Registrate-Refabricated"
+  },
+
+  "license": "MPL-2.0",
+  "icon": "assets/registrate-fabric/icon.png",
+
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+    ],
+    "preLaunch": [
+      "com.llamalad7.mixinextras.MixinExtrasBootstrap::init"
+    ]
+  },
+  "mixins": [
+  ],
+
+  "accessWidener": "registrate-fabric.accesswidener",
+
+  "depends": {
+    "fabricloader": ">=0.12.10",
+    "fabric": "*"
+  },
+
+  "custom": {
+    "modmenu": {
+      "badges": [ "library" ]
+    }
+  }
+}

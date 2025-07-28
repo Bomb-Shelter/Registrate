@@ -6,14 +6,14 @@ import javax.annotation.Nullable;
 
 import com.tterrag.registrate.AbstractRegistrate;
 
+import io.github.fabricators_of_create.porting_lib.fluids.BaseFlowingFluid;
+import io.github.fabricators_of_create.porting_lib.fluids.FluidType;
+import io.github.fabricators_of_create.porting_lib.registry.DeferredHolder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
-import net.neoforged.neoforge.fluids.BaseFlowingFluid;
-import net.neoforged.neoforge.fluids.FluidType;
-import net.neoforged.neoforge.registries.DeferredHolder;
 
 public class FluidEntry<T extends BaseFlowingFluid> extends RegistryEntry<Fluid, T> {
 

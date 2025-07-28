@@ -6,7 +6,7 @@ import com.tterrag.registrate.providers.ProviderType;
 import com.tterrag.registrate.providers.RegistrateLangProvider;
 import com.tterrag.registrate.providers.loot.RegistrateEntityLootTables;
 import com.tterrag.registrate.providers.loot.RegistrateLootTableProvider.LootType;
-import com.tterrag.registrate.util.OneTimeEventReceiver;
+
 import com.tterrag.registrate.util.RegistrateDistExecutor;
 import com.tterrag.registrate.util.entry.EntityEntry;
 import com.tterrag.registrate.util.entry.RegistryEntry;
@@ -15,6 +15,12 @@ import com.tterrag.registrate.util.nullness.NonNullConsumer;
 import com.tterrag.registrate.util.nullness.NonNullFunction;
 import com.tterrag.registrate.util.nullness.NonNullSupplier;
 
+import io.github.fabricators_of_create.porting_lib.registry.DeferredHolder;
+import io.github.fabricators_of_create.porting_lib.util.DeferredSpawnEggItem;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
+import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.core.registries.Registries;
@@ -27,13 +33,6 @@ import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.SpawnEggItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.loading.FMLEnvironment;
-import net.neoforged.neoforge.client.event.EntityRenderersEvent;
-import net.neoforged.neoforge.common.DeferredSpawnEggItem;
-import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
-import net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent;
-import net.neoforged.neoforge.registries.DeferredHolder;
 
 import javax.annotation.Nullable;
 import java.util.function.Supplier;
@@ -116,20 +115,20 @@ public class EntityBuilder<T extends Entity, P> extends AbstractBuilder<EntityTy
      * @return this {@link EntityBuilder}
      */
     public EntityBuilder<T, P> renderer(NonNullSupplier<NonNullFunction<EntityRendererProvider.Context, EntityRenderer<? super T>>> renderer) {
-        if (this.renderer == null && FMLEnvironment.dist.isClient()) { // First call only
-            RegistrateDistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> this::registerRenderer);
+        if (this.renderer == null && FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT) { // First call only
+            RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> this::registerRenderer);
         }
         this.renderer = renderer;
         return this;
     }
 
     protected void registerRenderer() {
-        OneTimeEventReceiver.addModListener(getOwner(), EntityRenderersEvent.RegisterRenderers.class, evt -> {
+        this.onRegister(type -> {
             var renderer = this.renderer;
             if (renderer != null) {
                 try {
                     var provider = renderer.get();
-                    evt.registerEntityRenderer(getEntry(), provider::apply);
+                    EntityRendererRegistry.register(type, provider::apply);
                 } catch (Exception e) {
                     throw new IllegalStateException("Failed to register renderer for Entity " + get().getId(), e);
                 }
@@ -154,7 +153,7 @@ public class EntityBuilder<T extends Entity, P> extends AbstractBuilder<EntityTy
             throw new IllegalStateException("Cannot configure attributes more than once");
         }
         attributesConfigured = true;
-        OneTimeEventReceiver.addModListener(getOwner(), EntityAttributeCreationEvent.class, e -> e.put((EntityType<LivingEntity>) getEntry(), attributes.get().build()));
+        this.onRegister(type -> FabricDefaultAttributeRegistry.register((EntityType<? extends LivingEntity>) type, attributes.get().build()));
         return this;
     }
 
@@ -174,7 +173,7 @@ public class EntityBuilder<T extends Entity, P> extends AbstractBuilder<EntityTy
      *             When called more than once
      */
     @SuppressWarnings("unchecked")
-    public EntityBuilder<T, P> spawnPlacement(SpawnPlacementType type, Heightmap.Types heightmap, SpawnPredicate<T> predicate, RegisterSpawnPlacementsEvent.Operation operation) {
+    public EntityBuilder<T, P> spawnPlacement(SpawnPlacementType type, Heightmap.Types heightmap, SpawnPredicate<T> predicate) {
         if (spawnConfigured) {
             throw new IllegalStateException("Cannot configure spawn placement more than once");
         }
@@ -189,9 +188,7 @@ public class EntityBuilder<T extends Entity, P> extends AbstractBuilder<EntityTy
                 throw new RuntimeException("Failed to type check entity " + t.getRegistryName() + " when registering spawn placement", e);
             }
             */
-            OneTimeEventReceiver.addModListener(getOwner(), RegisterSpawnPlacementsEvent.class, e -> {
-                e.register(t, type, heightmap, predicate, operation);
-            });
+            SpawnPlacements.register((EntityType) t, type, heightmap, (SpawnPredicate<? extends Mob>) predicate);
         });
         return this;
     }
