@@ -29,18 +29,15 @@ import io.github.fabricators_of_create.porting_lib.core.util.Lazy;
 import io.github.fabricators_of_create.porting_lib.fluids.BaseFlowingFluid;
 import io.github.fabricators_of_create.porting_lib.fluids.FluidType;
 import io.github.fabricators_of_create.porting_lib.fluids.PortingLibFluids;
-import io.github.fabricators_of_create.porting_lib.fluids.wrapper.FluidAttributeFluidType;
 import io.github.fabricators_of_create.porting_lib.registry.DeferredHolder;
 import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
 import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandler;
 import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandlerRegistry;
 import net.fabricmc.fabric.api.client.render.fluid.v1.SimpleFluidRenderHandler;
-import net.fabricmc.fabric.api.transfer.v1.client.fluid.FluidVariantRenderHandler;
 import net.minecraft.Util;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
@@ -63,7 +60,7 @@ public class FluidBuilder<T extends BaseFlowingFluid, P> extends AbstractBuilder
 
 
     @Nullable
-    private NonNullSupplier<Supplier<FluidRenderHandler>> clientExtension;
+    private NonNullSupplier<Supplier<DefaultFluidTypeExtension>> clientExtension;
 
     /**
      * Register a client extension for this block. The {@link FluidRenderHandler} instance can be shared across many items.
@@ -72,7 +69,7 @@ public class FluidBuilder<T extends BaseFlowingFluid, P> extends AbstractBuilder
      *            The client extension to register for this block
      * @return this {@link BlockBuilder}
      */
-    public FluidBuilder<T, P> clientExtension(NonNullSupplier<Supplier<FluidRenderHandler>> clientExtension) {
+    public FluidBuilder<T, P> clientExtension(NonNullSupplier<Supplier<DefaultFluidTypeExtension>> clientExtension) {
         if (this.clientExtension == null) {
             RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> this::registerClientExtension);
         }
@@ -80,9 +77,11 @@ public class FluidBuilder<T extends BaseFlowingFluid, P> extends AbstractBuilder
         return this;
     }
 
+    @Environment(EnvType.CLIENT)
     protected void registerClientExtension() {
         if (clientExtension != null) {
-            FluidRenderHandlerRegistry.INSTANCE.register(this.getEntry(), this.clientExtension.get().get());
+            var extension = this.clientExtension.get().get();
+            FluidRenderHandlerRegistry.INSTANCE.register(this.getEntry(), new SimpleFluidRenderHandler(extension.stillTexture(), extension.flowingTexture()));
         }
     }
 
@@ -655,10 +654,7 @@ public class FluidBuilder<T extends BaseFlowingFluid, P> extends AbstractBuilder
         return new FluidEntry<>(getOwner(), delegate);
     }
 
-	public static class DefaultFluidTypeExtension extends SimpleFluidRenderHandler {
-		public DefaultFluidTypeExtension(ResourceLocation stillTexture, ResourceLocation flowingTexture) {
-            super(stillTexture, flowingTexture);
-		}
+	public record DefaultFluidTypeExtension(ResourceLocation stillTexture, ResourceLocation flowingTexture) {
 	}
 
 }
