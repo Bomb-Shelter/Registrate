@@ -11,7 +11,7 @@ targetCompatibility = JavaVersion.VERSION_21
 
 version = "${project.mod_version}-MC${minecraft_version}"
 group = "com.tterrag.registrate_fabric"
-archivesBaseName = "Registrate-Fabric"
+base.archivesName = "Registrate-Fabric"
 
 String buildNumber = System.getenv("GITHUB_RUN_NUMBER")
 String patch = buildNumber != null ? buildNumber : "427199"
