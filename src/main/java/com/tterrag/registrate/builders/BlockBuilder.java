@@ -259,7 +259,7 @@ public class BlockBuilder<T extends Block, P> extends AbstractBuilder<Block, T, 
     // TODO it might be worthwhile to abstract this more and add the capability to automatically copy to the item
     public BlockBuilder<T, P> color(NonNullSupplier<Supplier<BlockColor>> colorHandler) {
         if (this.colorHandler == null) {
-            RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> this::registerBlockColor);
+            RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> () -> this.getOwner().registerRegisterListener(this::registerBlockColor));
         }
         this.colorHandler = colorHandler;
         return this;

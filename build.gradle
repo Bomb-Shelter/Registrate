@@ -14,7 +14,7 @@ group = "com.tterrag.registrate_fabric"
 base.archivesName = "Registrate-Fabric"
 
 String buildNumber = System.getenv("GITHUB_RUN_NUMBER")
-String patch = buildNumber != null ? buildNumber : "427199"
+String patch = buildNumber != null ? buildNumber : "427201"
 
 version = version.replace("<patch>", patch)
 
