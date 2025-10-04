@@ -219,12 +219,6 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
         return (S) this;
     }
 
-    private List<Runnable> runOnRegister = new ArrayList<>();
-
-    public void registerRegisterListener(Runnable listener) {
-        this.runOnRegister.add(listener);
-    }
-
     /**
      * Called during {@link Registrate#create(String) creation} to initialize event listeners. Custom implementations may add their own event listeners by overriding this.
      * <p>
@@ -249,13 +243,6 @@ public abstract class AbstractRegistrate<S extends AbstractRegistrate<S>> {
             OneTimeEventReceiver.unregister(this, onRegister, RegisterEvent.class);
             OneTimeEventReceiver.unregister(this, onRegisterLate, RegisterEvent.class);
         });*/
-
-        for (Runnable runnable : runOnRegister) {
-            runnable.run();
-        }
-
-        runOnRegister.clear();
-        runOnRegister = null;
 
         if (doDatagen.get()) {
             //OneTimeEventReceiver.addModListener(this, GatherDataEvent.class, this::onData);
