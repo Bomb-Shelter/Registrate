@@ -99,7 +99,9 @@ public class BlockBuilder<T extends Block, P> extends AbstractBuilder<Block, T, 
     
     private NonNullSupplier<BlockBehaviour.Properties> initialProperties;
     private NonNullFunction<BlockBehaviour.Properties, BlockBehaviour.Properties> propertiesCallback = NonNullUnaryOperator.identity();
-    private List<Supplier<Supplier<RenderType>>> renderLayers = new ArrayList<>(1);
+    //private List<Supplier<Supplier<RenderType>>> renderLayers = new ArrayList<>(1);
+    @Nullable
+    private Supplier<Supplier<RenderType>> renderLayer = null;
 
     @Nullable
     private NonNullSupplier<Supplier<BlockColor>> colorHandler;
@@ -145,25 +147,33 @@ public class BlockBuilder<T extends Block, P> extends AbstractBuilder<Block, T, 
         RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> () -> {
             Preconditions.checkArgument(RenderType.chunkBufferLayers().contains(layer.get().get()), "Invalid block layer: " + layer);
         });
-        if (this.renderLayers.isEmpty()) {
+//        if (this.renderLayers.isEmpty()) {
+//            onRegister(this::registerLayers);
+//        }
+//        this.renderLayers.add(layer);
+
+        if (this.renderLayer == null) {
             onRegister(this::registerLayers);
         }
-        this.renderLayers.add(layer);
+
+        this.renderLayer = layer;
         return this;
     }
 
     @SuppressWarnings("deprecation")
     protected void registerLayers(T entry) {
         RegistrateDistExecutor.unsafeRunWhenOn(EnvType.CLIENT, () -> () -> {
-            if (renderLayers.size() == 1) {
+            /*if (renderLayers.size() == 1) {
                 final RenderType layer = renderLayers.get(0).get().get();
                 BlockRenderLayerMap.INSTANCE.putBlock(entry, layer);
-            } /*else if (renderLayers.size() > 1) { // no
+            } else if (renderLayers.size() > 1) { // no
                 final Set<RenderType> layers = renderLayers.stream()
                     .map(s -> s.get().get())
                     .collect(Collectors.toSet());
                 ItemBlockRenderTypes.setRenderLayer(entry, layers::contains);
             }*/
+
+            BlockRenderLayerMap.INSTANCE.putBlock(entry, this.renderLayer.get().get());
         });
     }
 
